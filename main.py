@@ -30,8 +30,15 @@ class NikoApp:
         self.accent_color = '#FF1493'  # Pembe
         self.text_color = '#FFFFFF'
         
+        # Sesli dinleme durumu
+        self.listening = False
+        self.continuous_listening = True
+        
         self.setup_ui()
         self.load_contacts()
+        
+        # Arka planda sürekli sesli komut dinlemesini başlat
+        self.start_continuous_listening()
         
     def setup_ui(self):
         """Arayüzü kuruyor"""
@@ -47,6 +54,7 @@ class NikoApp:
             bg=self.bg_color
         )
         avatar_label.pack()
+        self.avatar_label = avatar_label
         
         name_label = tk.Label(
             avatar_frame,
@@ -60,7 +68,7 @@ class NikoApp:
         # Durum etiketi
         self.status_label = tk.Label(
             self.root,
-            text="Hazırım, söyleyin!",
+            text="🎤 Dinliyorum... 'Niko' deyin!",
             font=("Arial", 12),
             fg=self.accent_color,
             bg=self.bg_color
@@ -140,7 +148,7 @@ class NikoApp:
         
         self.input_text.delete(0, tk.END)
         self.add_message("Siz", message)
-        self.status_label.config(text="Düşünüyorum...")
+        self.status_label.config(text="🤔 Düşünüyorum...")
         
         # Thread'de işleme
         threading.Thread(target=self.process_command, args=(message,), daemon=True).start()
@@ -171,53 +179,64 @@ class NikoApp:
                 # Tıbbi analiz
                 response = self.niko_ai.analyze_symptoms(text)
                 self.add_message("Niko", response)
+                # Sesli cevap ver
+                self.voice_manager.speak(response)
         
         except Exception as e:
-            self.add_message("Niko", f"Hata oluştu: {str(e)}")
+            error_msg = f"Hata oluştu: {str(e)}"
+            self.add_message("Niko", error_msg)
         
-        self.status_label.config(text="Hazırım, söyleyin!")
+        self.status_label.config(text="🎤 Dinliyorum... 'Niko' deyin!")
     
     def handle_call(self, text):
         """Telefon çalması"""
         contact_name = self.extract_contact(text)
         result = self.phone_features.make_call(contact_name)
         self.add_message("Niko", result)
+        self.voice_manager.speak(result)
     
     def handle_sms(self, text):
         """Mesaj gönderme"""
         contact_name = self.extract_contact(text)
         result = self.phone_features.send_sms(contact_name, text)
         self.add_message("Niko", result)
+        self.voice_manager.speak(result)
     
     def handle_calendar(self, text):
         """Takvim ve hatırlatıcı"""
         result = self.phone_features.add_reminder(text)
         self.add_message("Niko", result)
+        self.voice_manager.speak(result)
     
     def handle_timer(self, text):
         """Timer ve alarm"""
         result = self.phone_features.set_timer(text)
         self.add_message("Niko", result)
+        self.voice_manager.speak(result)
     
     def handle_music(self, text):
         """Müzik çalma"""
         result = self.phone_features.play_music(text)
         self.add_message("Niko", result)
+        self.voice_manager.speak(result)
     
     def handle_map(self, text):
         """Harita ve konum"""
         result = self.phone_features.find_location(text)
         self.add_message("Niko", result)
+        self.voice_manager.speak(result)
     
     def handle_weather(self, text):
         """Hava durumu"""
         result = self.phone_features.get_weather()
         self.add_message("Niko", result)
+        self.voice_manager.speak(result)
     
     def handle_web_search(self, text):
         """İnternet arama"""
         result = self.phone_features.web_search(text)
         self.add_message("Niko", result)
+        self.voice_manager.speak(result[:100])  # İlk 100 char sesli ver
     
     def extract_contact(self, text):
         """Metinden kişi adı çıkarma"""
@@ -240,11 +259,47 @@ class NikoApp:
             self.root.after(100, self.send_message)
         except Exception as e:
             self.add_message("Niko", f"Ses tanıma hatası: {str(e)}")
-            self.status_label.config(text="Hazırım, söyleyin!")
+            self.status_label.config(text="🎤 Dinliyorum... 'Niko' deyin!")
+    
+    def start_continuous_listening(self):
+        """Arka planda sürekli sesli komut dinlemesini başlat"""
+        threading.Thread(target=self._continuous_listening_thread, daemon=True).start()
+    
+    def _continuous_listening_thread(self):
+        """Arka planda sürekli dinleme yapan thread"""
+        while self.continuous_listening:
+            try:
+                # Sesli komut dinle
+                text = self.voice_manager.listen_without_timeout()
+                
+                if text and 'niko' in text.lower():
+                    # Avatar renk değişimi (canlanma)
+                    self.avatar_label.config(fg='#FF69B4')
+                    self.root.after(100, lambda: self.avatar_label.config(fg=self.accent_color))
+                    
+                    # "Niko" duyunca daha detaylı dinle
+                    self.status_label.config(text="👂 Evet, buradayım! Ne istiyorsunuz?")
+                    self.voice_manager.speak("Buradayım, ne yardimci olabilirim?")
+                    
+                    # Komut dinle
+                    command = self.voice_manager.listen()
+                    if command and command != "Anlamadım, lütfen tekrar söyleyin.":
+                        self.input_text.delete(0, tk.END)
+                        self.input_text.insert(0, command)
+                        self.root.after(100, self.send_message)
+                    
+                    self.status_label.config(text="🎤 Dinliyorum... 'Niko' deyin!")
+                
+            except Exception as e:
+                print(f"Sürekli dinleme hatası: {str(e)}")
+                continue
     
     def show_contacts(self):
         """Kişiler listesi gösterme"""
-        self.add_message("Niko", "Kişileri gösteri") 
+        contacts_text = "📞 Kaydedilen Kişiler:\n"
+        for name, phone in self.contacts.items():
+            contacts_text += f"• {name}: {phone}\n"
+        self.add_message("Niko", contacts_text)
     
     def show_calendar(self):
         """Takvim gösterme"""
