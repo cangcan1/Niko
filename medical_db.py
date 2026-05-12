@@ -11,9 +11,9 @@ class MedicalDatabase:
                 'description': '🦠 Grip (Influenza): Viral bir enfeksiyon. Belirtiler: ateş (38-40°C), öksürük, burun akıntısı, halsizlik, kas ağrıları.',
                 'advice': '✅ Bol su içiniz, dinlenin. İbuprofenle ateşi düşürün. 3-5 gün içinde geçmelidir. Eğer kötüye giderse doktora gidin.'
             },
-            'soğuk algınlığı': {
+            'soğuk alğınlığı': {
                 'symptoms': ['öksürük', 'burun tıkanıklığı', 'boğaz ağrısı'],
-                'description': '🤧 Soğuk Algınlığı: Viral enfeksiyon. Belirtiler: burun tıkanıklığı, öksürük, boğaz ağrısı, çoğunlukla ateş yoktur.',
+                'description': '🤧 Soğuk Alğınlığı: Viral enfeksiyon. Belirtiler: burun tıkanıklığı, öksürük, boğaz ağrısı, çoğunlukla ateş yoktur.',
                 'advice': '✅ Sıcak çay için, madu ekleyin. Bol su içiniz. Genellikle 3-7 günde geçer.'
             },
             'baş ağrısı': {
@@ -23,7 +23,7 @@ class MedicalDatabase:
             },
             'boğaz ağrısı': {
                 'symptoms': ['boğaz ağrısı', 'yutarken ağrı', 'iltihap'],
-                'description': '😤 Boğaz Ağrısı: Viral veya bakteriyel enfeksiyon. Tonsillitler çok yaygındır.',
+                'description': '😷 Boğaz Ağrısı: Viral veya bakteriyel enfeksiyon. Tonsillitler çok yaygındır.',
                 'advice': '✅ Tuz suyuyla gargara yapın. Sıcak çay için. Antibiyotik gerekebilir - doktora danışın.'
             },
             'mide ağrısı': {
@@ -38,7 +38,7 @@ class MedicalDatabase:
             },
             'öksürük': {
                 'symptoms': ['öksürük', 'boğaz ağrısı', 'balgam'],
-                'description': '😷 Öksürük: Genellikle viral enfeksiyondan kaynaklanır.',
+                'description': '🤐 Öksürük: Genellikle viral enfeksiyondan kaynaklanır.',
                 'advice': '✅ Sıcak çay içiniz. Madu ekleyin. Öksürük şurubu alınız. Eğer 2 hafta devam ederse doktora gidin.'
             }
         }

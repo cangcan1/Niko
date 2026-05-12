@@ -6,8 +6,10 @@ import os
 import json
 import re
 from datetime import datetime, timedelta
-from duckduckgo_search import DDGS
-import subprocess
+try:
+    from duckduckgo_search import DDGS
+except:
+    DDGS = None
 
 class PhoneFeatures:
     """Telefon gibi özellikler"""
@@ -33,7 +35,6 @@ class PhoneFeatures:
     def add_reminder(self, text):
         """Hatırlatıcı ekleme"""
         try:
-            # Zaman bilgisini çıkarmaya çalış
             if 'yarın' in text.lower():
                 time = datetime.now() + timedelta(days=1)
             elif 'bugün' in text.lower():
@@ -54,7 +55,6 @@ class PhoneFeatures:
     
     def set_timer(self, text):
         """Timer ve alarm ayarlama"""
-        # Sayı çıkart
         numbers = re.findall(r'\d+', text)
         if numbers:
             time_value = numbers[0]
@@ -68,9 +68,8 @@ class PhoneFeatures:
     
     def play_music(self, text):
         """Müzik çalma"""
-        # Müzik adını çıkart
-        if 'rahatlatıcı' in text.lower():
-            return "🎵 Rahatlatıcı müzik çalınıyor... 🎧"
+        if 'rahatlayıcı' in text.lower():
+            return "🎵 Rahatlayıcı müzik çalınıyor... 🎧"
         elif 'şarkı' in text.lower() or 'müzik' in text.lower():
             return "🎵 Müzik kütüphanesi açılıyor..."
         return "🎵 Müzik çalınıyor..."
@@ -78,15 +77,16 @@ class PhoneFeatures:
     def find_location(self, text):
         """Konum bulma - Harita aç"""
         if 'hastane' in text.lower():
-            location = "Yakındaki Hastaneler"
+            location = "hospitals"
+            display = "Yakındaki Hastaneler"
         elif 'eczane' in text.lower() or 'eczacı' in text.lower():
-            location = "Yakındaki Eczaneler"
-        elif 'hastane' in text.lower():
-            location = "Acil Servis"
+            location = "pharmacies"
+            display = "Yakındaki Eczaneler"
         else:
-            location = text.split(':')[-1] if ':' in text else "Konum"
+            location = text.split(':')[-1] if ':' in text else "konum"
+            display = location
         
-        return f"📍 Google Harita açılıyor: {location}"
+        return f"📍 Google Harita açılıyor: {display}"
     
     def get_weather(self):
         """Hava durumu"""
@@ -95,21 +95,20 @@ class PhoneFeatures:
     def web_search(self, text):
         """İnternet arama (DuckDuckGo)"""
         try:
-            # Arama terimini çıkart
             search_term = text.replace('arama', '').replace('araştır', '').replace('internet', '').strip()
             
             if not search_term:
                 return "🔍 Arama terimi giriniz"
             
-            # DuckDuckGo search
-            results = DDGS().text(search_term, max_results=3)
-            
-            response = f"🔍 '{search_term}' için arama sonuçları:\n\n"
-            for i, result in enumerate(results, 1):
-                response += f"{i}. {result['title']}\n"
-                response += f"   {result['body'][:150]}...\n\n"
-            
-            return response
+            if DDGS:
+                results = DDGS().text(search_term, max_results=3)
+                response = f"🔍 '{search_term}' için arama sonuçları:\n\n"
+                for i, result in enumerate(results, 1):
+                    response += f"{i}. {result['title']}\n"
+                    response += f"   {result['body'][:150]}...\n\n"
+                return response
+            else:
+                return f"🔍 '{search_term}' için arama yapılıyor...\n\n💡 (Demo mode - İnternet arama kütüphanesi kurulu değil)"
         except Exception as e:
             return f"❌ Arama hatası: {str(e)}"
     
