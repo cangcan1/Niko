@@ -2,122 +2,136 @@
 # -*- coding: utf-8 -*-
 
 import requests
+import json
 from datetime import datetime
 
 class WeatherDashboard:
-    """Hava Durumu Gösterge Paneli"""
+    """Hava durumu paneli"""
     
     def __init__(self):
-        # OpenWeatherMap API (ücretsiz)
-        self.api_key = "2d4b5aee0c2f5abfe5eeea6d23b05c45"  # Demo API key
-        self.base_url = "https://api.openweathermap.org/data/2.5/weather"
-        self.forecast_url = "https://api.openweathermap.org/data/2.5/forecast"
+        # Ücretsiz API kullan (API anahtarı gerekmiyor)
+        self.weather_api = "https://open-meteo.com/en/docs"
+        self.base_url = "https://api.open-meteo.com/v1/forecast"
+        self.geo_url = "https://geocoding-api.open-meteo.com/v1/search"
     
-    def get_weather(self, city="Istanbul"):
-        """Hava durumunu al"""
+    def get_coordinates(self, city):
+        """Şehrin koordinatlarını al"""
         try:
-            # Güncel hava durumu
             params = {
-                'q': city,
-                'appid': self.api_key,
-                'units': 'metric',
-                'lang': 'tr'
+                'name': city,
+                'count': 1,
+                'language': 'en'
+            }
+            response = requests.get(self.geo_url, params=params, timeout=5)
+            response.raise_for_status()
+            data = response.json()
+            
+            if 'results' in data and len(data['results']) > 0:
+                result = data['results'][0]
+                return {
+                    'latitude': result['latitude'],
+                    'longitude': result['longitude'],
+                    'name': result.get('name', city),
+                    'country': result.get('country', '')
+                }
+            return None
+        except Exception as e:
+            print(f"Koordinat hatası: {e}")
+            return None
+    
+    def get_weather(self, city):
+        """Hava durumunu getir"""
+        try:
+            # Koordinatları al
+            coords = self.get_coordinates(city)
+            if not coords:
+                return f"❌ '{city}' şehri bulunamadı!"
+            
+            # Hava verisi al
+            params = {
+                'latitude': coords['latitude'],
+                'longitude': coords['longitude'],
+                'current': 'temperature_2m,weather_code,wind_speed_10m,relative_humidity_2m',
+                'daily': 'weather_code,temperature_2m_max,temperature_2m_min',
+                'timezone': 'auto'
             }
             
             response = requests.get(self.base_url, params=params, timeout=5)
+            response.raise_for_status()
+            data = response.json()
             
-            if response.status_code == 200:
-                data = response.json()
-                return self.format_weather(data, city)
-            else:
-                return f"❌ {city} için hava durumu bilgisi bulunamadı.\n\n💡 İpucu: Şehir adını doğru yazın (örn: İstanbul, Ankara, İzmir)"
-        
-        except requests.exceptions.Timeout:
-            return "⏱️ İnternet bağlantısı yavaş. Lütfen tekrar deneyin."
-        except Exception as e:
-            return f"❌ Hava durumu alırken hata: {str(e)}\n\n💡 Demo mod aktif. Gerçek API anahtarını ekleyin."
-    
-    def format_weather(self, data, city):
-        """Hava durumu bilgisini formatla"""
-        try:
-            weather = data.get('main', {})
-            description = data.get('weather', [{}])[0].get('description', 'Bilinmiyor')
-            wind = data.get('wind', {})
-            clouds = data.get('clouds', {})
-            timestamp = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
-            
-            # Emoji seçimi
-            emoji_map = {
-                'açık': '☀️',
-                'bulutlu': '⛅',
-                'yağmurlu': '🌧️',
-                'kar': '❄️',
-                'gök gürültü': '⛈️',
-                'sis': '🌫️',
+            # Hava kodu açıklaması
+            weather_codes = {
+                0: '☀️ Açık',
+                1: '🌤️ Hafif bulutlu',
+                2: '⛅ Açık bulutlu',
+                3: '☁️ Bulutlu',
+                45: '🌫️ Sisli',
+                48: '🌫️ Sis (Kırağı)',
+                51: '🌧️ Hafif çisenti',
+                53: '🌧️ Çisenti',
+                55: '🌧️ Yoğun çisenti',
+                61: '🌧️ Hafif yağmur',
+                63: '🌧️ Yağmur',
+                65: '🌧️ Yoğun yağmur',
+                71: '❄️ Hafif kar',
+                73: '❄️ Kar',
+                75: '❄️ Yoğun kar',
+                77: '❄️ Kar taneleri',
+                80: '🌧️ Hafif sağanak',
+                81: '🌧️ Sağanak',
+                82: '🌧️ Yoğun sağanak',
+                85: '🌨️ Hafif kar sağanağı',
+                86: '🌨️ Kar sağanağı',
+                95: '⛈️ Gök gürültülü',
+                96: '⛈️ Gök gürültü + dolu',
+                99: '⛈️ Gök gürültü + kar'
             }
             
-            emoji = '🌤️'
-            for key, value in emoji_map.items():
-                if key in description.lower():
-                    emoji = value
-                    break
+            current = data.get('current', {})
+            daily = data.get('daily', {})
             
-            weather_text = f"""
-╔════════════════════════════════════════════════════════════════╗
-║          🌍 {city.upper()} - HAVA DURUMU RAPORU                  ║
-╚════════════════════════════════════════════════════════════════╝
+            weather_code = current.get('weather_code', 0)
+            weather_desc = weather_codes.get(weather_code, '❓ Bilinmiyor')
+            
+            # Formatlı çıktı
+            output = f"""
+╔══════════════════════════════════════════════════════════╗
+║ 🌍 {coords['name'].upper()}, {coords['country']}
+╚═══════════════���══════════════════════════════════════════╝
 
-📅 Tarih ve Saat: {timestamp}
+📍 Konum: Lat {coords['latitude']}, Lon {coords['longitude']}
+🕐 Güncelleme: {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}
 
-🌡️  SICAKLIK BİLGİSİ:
-  • Mevcut Sıcaklık: {weather.get('temp', 'N/A')}°C
-  • Hissedilen Sıcaklık: {weather.get('feels_like', 'N/A')}°C
-  • Minimum Sıcaklık: {weather.get('temp_min', 'N/A')}°C
-  • Maksimum Sıcaklık: {weather.get('temp_max', 'N/A')}°C
+━━━━━━━━━━━━━━━━━━ GÜNCEL HAVA ━━━━━━━━━━━━━━━━━━
 
-💧 NEM VE BASKI:
-  • Nem Oranı: {weather.get('humidity', 'N/A')}%
-  • Hava Basıncı: {weather.get('pressure', 'N/A')} hPa
+🌡️  Sıcaklık: {current.get('temperature_2m', 'N/A')}°C
+{weather_desc}
+💨 Rüzgar Hızı: {current.get('wind_speed_10m', 'N/A')} km/s
+💧 Nem: {current.get('relative_humidity_2m', 'N/A')}%
 
-💨 RÜZGAR BİLGİSİ:
-  • Rüzgar Hızı: {wind.get('speed', 'N/A')} m/s
-  • Rüzgar Yönü: {wind.get('deg', 'N/A')}°
-  • Rüzgar Eşeği: {wind.get('gust', 'N/A')} m/s
-
-☁️ BULUTLULUK:
-  • Bulut Yüzdesi: {clouds.get('all', 'N/A')}%
-
-{emoji} HAVA DURUMU: {description.upper()}
-
-═══════════════════════════════════════════════════════════════════
-
-💡 ÖNERİLER:
+━━━━━━━━━━━━━━━━━━ GÜNLÜKür ━━━━━━━━━━━━━━━━━━
 """
             
-            # Sıcaklığa göre öneriler
-            temp = weather.get('temp', 0)
-            if temp < 0:
-                weather_text += "  ❄️ Çok soğuk! Kalın giysiler giyin."
-            elif temp < 10:
-                weather_text += "  🧥 Soğuk hava. Mont giyiniz."
-            elif temp < 20:
-                weather_text += "  🌤️ Tempereli hava. Hafif kat giyin."
-            elif temp < 30:
-                weather_text += "  ☀️ Güzel hava. Dışarı çıkmak için ideal!"
-            else:
-                weather_text += "  🔥 Çok sıcak! Serin yerlerde kalın ve bol su için."
+            # Günlük tahminler
+            if 'time' in daily:
+                for i in range(min(3, len(daily['time']))):
+                    date = daily['time'][i]
+                    max_temp = daily['temperature_2m_max'][i]
+                    min_temp = daily['temperature_2m_min'][i]
+                    code = daily['weather_code'][i]
+                    desc = weather_codes.get(code, '❓')
+                    
+                    output += f"\n📅 {date}\n"
+                    output += f"   🔥 Max: {max_temp}°C | ❄️ Min: {min_temp}°C\n"
+                    output += f"   {desc}\n"
             
-            # Yağmur uyarısı
-            if 'yağmur' in description.lower() or 'sağanak' in description.lower():
-                weather_text += "\n  🌧️ Yağmur bekleniyor! Şemsiye almayı unutmayın."
-            
-            # Rüzgar uyarısı
-            if wind.get('speed', 0) > 10:
-                weather_text += "\n  💨 Güçlü rüzgar! Dikkatli olun."
-            
-            weather_text += "\n\n═══════════════════════════════════════════════════════════════════"
-            
-            return weather_text
+            output += "\n" + "="*60
+            return output
         
+        except requests.exceptions.Timeout:
+            return "❌ İstek zaman aşımına uğradı. İnternet bağlantınızı kontrol edin."
+        except requests.exceptions.ConnectionError:
+            return "❌ İnternet bağlantısı yok!"
         except Exception as e:
-            return f"❌ Hava durumu formatlanırken hata: {str(e)}"
+            return f"❌ Hava durumu hatası: {str(e)}"

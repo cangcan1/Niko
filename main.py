@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import tkinter as tk
-from tkinter import scrolledtext, messagebox, ttk
+from tkinter import ttk, scrolledtext, messagebox
 import threading
 import os
 from dotenv import load_dotenv
@@ -12,147 +12,136 @@ from voice_manager import VoiceManager
 from todo_manager import TodoManager
 from weather_dashboard import WeatherDashboard
 import json
+from datetime import datetime
 
 load_dotenv()
 
 class NikoApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("🤖 Niko - AI Tıbbi Asistan")
+        self.root.title("Niko - AI Tıbbi Asistan & Uydu Telefon")
         self.root.geometry("1100x800")
         self.root.configure(bg='#0a0e27')
-        
-        # Niko AI ve telefon özellikleri
-        try:
-            self.niko_ai = NikoAI(api_key=os.getenv('OPENAI_API_KEY'))
-        except:
-            self.niko_ai = NikoAI(api_key="demo")
-        
-        self.phone_features = PhoneFeatures()
-        self.voice_manager = VoiceManager()
-        self.todo_manager = TodoManager()
-        self.weather_dashboard = WeatherDashboard()
         
         # Tema renkleri
         self.bg_color = '#0a0e27'
         self.accent_color = '#FF1493'  # Pembe
         self.text_color = '#FFFFFF'
+        self.dark_bg = '#1a1f3a'
+        
+        # Modülleri yükle
+        try:
+            self.niko_ai = NikoAI(api_key=os.getenv('OPENAI_API_KEY'))
+        except:
+            self.niko_ai = None
+            
+        self.phone_features = PhoneFeatures()
+        self.voice_manager = VoiceManager()
+        self.todo_manager = TodoManager()
+        self.weather_dashboard = WeatherDashboard()
         
         # Sesli dinleme durumu
         self.listening = False
         self.continuous_listening = True
-        self.current_tab = 'chat'
         
         self.setup_ui()
         self.load_contacts()
         
-        # Arka planda sürekli sesli komut dinlemesini başlat
+        # Arka planda sesli dinlemeyi başlat
         self.start_continuous_listening()
         
     def setup_ui(self):
-        """Arayüzü kuruyor - Sekmeleri ve menüyü ekliyor"""
-        # Üst panel - Başlık
-        header_frame = tk.Frame(self.root, bg=self.accent_color, height=60)
-        header_frame.pack(fill=tk.X)
-        
-        header_label = tk.Label(
-            header_frame,
-            text="🤖 NIKO - AI Tıbbi Asistan & Asistan",
-            font=("Arial", 16, "bold"),
-            fg='#000000',
-            bg=self.accent_color
-        )
-        header_label.pack(pady=10)
-        
-        # Sekmeler (Tabs)
-        self.notebook = ttk.Notebook(self.root)
-        self.notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        
-        # CSS stili ayarla
-        style = ttk.Style()
-        style.theme_use('clam')
-        style.configure('TNotebook', background=self.bg_color, borderwidth=0)
-        style.configure('TNotebook.Tab', background=self.accent_color, foreground='#000000')
-        style.map('TNotebook.Tab', background=[('selected', '#FF69B4')])
-        
-        # Sekme 1: Chat
-        self.chat_frame = tk.Frame(self.notebook, bg=self.bg_color)
-        self.notebook.add(self.chat_frame, text="💬 Chat")
-        self.setup_chat_tab()
-        
-        # Sekme 2: Todo List
-        self.todo_frame = tk.Frame(self.notebook, bg=self.bg_color)
-        self.notebook.add(self.todo_frame, text="📝 Todo Liste")
-        self.setup_todo_tab()
-        
-        # Sekme 3: Hava Durumu
-        self.weather_frame = tk.Frame(self.notebook, bg=self.bg_color)
-        self.notebook.add(self.weather_frame, text="🌤️ Hava Durumu")
-        self.setup_weather_tab()
-        
-        # Sekme 4: Ayarlar
-        self.settings_frame = tk.Frame(self.notebook, bg=self.bg_color)
-        self.notebook.add(self.settings_frame, text="⚙️ Ayarlar")
-        self.setup_settings_tab()
-    
-    def setup_chat_tab(self):
-        """Chat sekmesini kuruyor"""
-        # Avatar
-        avatar_frame = tk.Frame(self.chat_frame, bg=self.bg_color)
-        avatar_frame.pack(pady=10)
+        """Ana arayüzü kuruyor"""
+        # Üst panel - Niko Avatar
+        top_frame = tk.Frame(self.root, bg=self.bg_color)
+        top_frame.pack(fill=tk.X, pady=15)
         
         avatar_label = tk.Label(
-            avatar_frame,
+            top_frame,
             text="●",
-            font=("Arial", 80),
+            font=("Arial", 60),
             fg=self.accent_color,
             bg=self.bg_color
         )
-        avatar_label.pack()
+        avatar_label.pack(side=tk.LEFT, padx=20)
         self.avatar_label = avatar_label
         
+        info_frame = tk.Frame(top_frame, bg=self.bg_color)
+        info_frame.pack(side=tk.LEFT, padx=20, fill=tk.BOTH, expand=True)
+        
         name_label = tk.Label(
-            avatar_frame,
-            text="NIKO",
+            info_frame,
+            text="NIKO - AI Tıbbi Asistan",
             font=("Arial", 16, "bold"),
             fg=self.text_color,
             bg=self.bg_color
         )
-        name_label.pack()
+        name_label.pack(anchor=tk.W)
         
-        # Durum etiketi
         self.status_label = tk.Label(
-            self.chat_frame,
+            info_frame,
             text="🎤 Dinliyorum... 'Niko' deyin!",
             font=("Arial", 11),
             fg=self.accent_color,
             bg=self.bg_color
         )
-        self.status_label.pack()
+        self.status_label.pack(anchor=tk.W)
         
-        # Chat alanı
-        chat_inner_frame = tk.Frame(self.chat_frame, bg=self.bg_color)
-        chat_inner_frame.pack(fill=tk.BOTH, expand=True, padx=15, pady=10)
+        # Sekme paneli
+        notebook = ttk.Notebook(self.root)
+        notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
+        # Stil ayarla
+        style = ttk.Style()
+        style.theme_use('clam')
+        style.configure('TNotebook', background=self.bg_color)
+        style.configure('TNotebook.Tab', padding=[20, 10])
+        style.map('TNotebook.Tab', background=[('selected', self.accent_color)])
+        
+        # 1. Chat Sekmesi
+        self.chat_frame = tk.Frame(notebook, bg=self.dark_bg)
+        notebook.add(self.chat_frame, text="💬 Chat")
+        self.setup_chat_tab()
+        
+        # 2. Todo Sekmesi
+        self.todo_frame = tk.Frame(notebook, bg=self.dark_bg)
+        notebook.add(self.todo_frame, text="📝 Görevler")
+        self.setup_todo_tab()
+        
+        # 3. Hava Durumu Sekmesi
+        self.weather_frame = tk.Frame(notebook, bg=self.dark_bg)
+        notebook.add(self.weather_frame, text="🌤️ Hava")
+        self.setup_weather_tab()
+        
+        # 4. Ayarlar Sekmesi
+        self.settings_frame = tk.Frame(notebook, bg=self.dark_bg)
+        notebook.add(self.settings_frame, text="⚙️ Ayarlar")
+        self.setup_settings_tab()
+    
+    def setup_chat_tab(self):
+        """Chat sekmesini kuruyor"""
+        # Chat ekranı
         self.chat_display = scrolledtext.ScrolledText(
-            chat_inner_frame,
+            self.chat_frame,
             height=20,
             width=100,
-            bg='#1a1f3a',
+            bg=self.bg_color,
             fg=self.text_color,
             insertbackground=self.accent_color,
-            font=("Arial", 10)
+            font=("Courier", 10),
+            padx=10,
+            pady=10
         )
-        self.chat_display.pack(fill=tk.BOTH, expand=True)
+        self.chat_display.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         self.chat_display.config(state=tk.DISABLED)
         
-        # Giriş alanı
-        input_frame = tk.Frame(self.chat_frame, bg=self.bg_color)
-        input_frame.pack(fill=tk.X, padx=15, pady=10)
+        # Giriş paneli
+        input_frame = tk.Frame(self.chat_frame, bg=self.dark_bg)
+        input_frame.pack(fill=tk.X, padx=10, pady=10)
         
         self.input_text = tk.Entry(
             input_frame,
-            bg='#1a1f3a',
+            bg=self.bg_color,
             fg=self.text_color,
             insertbackground=self.accent_color,
             font=("Arial", 11)
@@ -161,16 +150,14 @@ class NikoApp:
         self.input_text.bind('<Return>', lambda e: self.send_message())
         
         # Buton paneli
-        button_frame = tk.Frame(self.chat_frame, bg=self.bg_color)
-        button_frame.pack(fill=tk.X, padx=15, pady=10)
+        button_frame = tk.Frame(self.chat_frame, bg=self.dark_bg)
+        button_frame.pack(fill=tk.X, padx=10, pady=10)
         
         buttons = [
             ("🎤 Sesli", self.voice_input),
             ("📤 Gönder", self.send_message),
-            ("📞 Kişiler", self.show_contacts),
-            ("🌍 Arama", self.web_search),
-            ("🎵 Müzik", self.play_music),
-            ("📍 Harita", self.show_map),
+            ("📞 Ki şiler", self.show_contacts),
+            ("🗑️ Temizle", self.clear_chat),
         ]
         
         for btn_text, cmd in buttons:
@@ -180,36 +167,33 @@ class NikoApp:
                 command=cmd,
                 bg=self.accent_color,
                 fg='#000000',
-                font=("Arial", 9, "bold"),
-                padx=10,
-                pady=5
+                font=("Arial", 10, "bold"),
+                padx=15,
+                pady=8
             )
-            btn.pack(side=tk.LEFT, padx=3)
+            btn.pack(side=tk.LEFT, padx=5)
     
     def setup_todo_tab(self):
-        """Todo List sekmesini kuruyor"""
-        # Başlık
-        title_label = tk.Label(
-            self.todo_frame,
-            text="📝 Görev Listesi",
-            font=("Arial", 14, "bold"),
-            fg=self.accent_color,
-            bg=self.bg_color
-        )
-        title_label.pack(pady=10)
+        """Todo sekmesini kuruyor"""
+        input_frame = tk.Frame(self.todo_frame, bg=self.dark_bg)
+        input_frame.pack(fill=tk.X, padx=10, pady=10)
         
-        # Giriş alanı
-        input_frame = tk.Frame(self.todo_frame, bg=self.bg_color)
-        input_frame.pack(fill=tk.X, padx=15, pady=10)
+        tk.Label(
+            input_frame,
+            text="Yeni Görev:",
+            bg=self.dark_bg,
+            fg=self.text_color,
+            font=("Arial", 10)
+        ).pack(side=tk.LEFT, padx=5)
         
         self.todo_input = tk.Entry(
             input_frame,
-            bg='#1a1f3a',
+            bg=self.bg_color,
             fg=self.text_color,
-            insertbackground=self.accent_color,
-            font=("Arial", 11)
+            font=("Arial", 10),
+            width=50
         )
-        self.todo_input.pack(fill=tk.X, side=tk.LEFT, expand=True, padx=5)
+        self.todo_input.pack(side=tk.LEFT, expand=True, padx=5)
         self.todo_input.bind('<Return>', lambda e: self.add_todo())
         
         add_btn = tk.Button(
@@ -218,30 +202,42 @@ class NikoApp:
             command=self.add_todo,
             bg=self.accent_color,
             fg='#000000',
-            font=("Arial", 10, "bold"),
-            padx=15,
-            pady=5
+            font=("Arial", 10, "bold")
         )
         add_btn.pack(side=tk.LEFT, padx=5)
         
         # Todo listesi
-        list_frame = tk.Frame(self.todo_frame, bg=self.bg_color)
-        list_frame.pack(fill=tk.BOTH, expand=True, padx=15, pady=10)
+        list_frame = tk.Frame(self.todo_frame, bg=self.dark_bg)
+        list_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
-        self.todo_display = tk.Listbox(
+        scrollbar = tk.Scrollbar(list_frame)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        self.todo_listbox = tk.Listbox(
             list_frame,
-            bg='#1a1f3a',
+            bg=self.bg_color,
             fg=self.text_color,
             font=("Arial", 11),
-            borderwidth=0,
-            activestyle='none'
+            yscrollcommand=scrollbar.set,
+            selectmode=tk.SINGLE
         )
-        self.todo_display.pack(fill=tk.BOTH, expand=True)
-        self.todo_display.bind('<Double-Button-1>', self.toggle_todo)
+        self.todo_listbox.pack(fill=tk.BOTH, expand=True)
+        self.todo_listbox.bind('<Double-Button-1>', lambda e: self.toggle_todo())
+        scrollbar.config(command=self.todo_listbox.yview)
         
-        # Butonlar
-        button_frame = tk.Frame(self.todo_frame, bg=self.bg_color)
-        button_frame.pack(fill=tk.X, padx=15, pady=10)
+        # Buton paneli
+        button_frame = tk.Frame(self.todo_frame, bg=self.dark_bg)
+        button_frame.pack(fill=tk.X, padx=10, pady=10)
+        
+        tk.Button(
+            button_frame,
+            text="✅ Tamamla",
+            command=self.toggle_todo,
+            bg=self.accent_color,
+            fg='#000000',
+            font=("Arial", 10, "bold"),
+            padx=15
+        ).pack(side=tk.LEFT, padx=5)
         
         tk.Button(
             button_frame,
@@ -250,70 +246,56 @@ class NikoApp:
             bg='#FF6B6B',
             fg='#FFFFFF',
             font=("Arial", 10, "bold"),
-            padx=10
-        ).pack(side=tk.LEFT, padx=5)
-        
-        tk.Button(
-            button_frame,
-            text="🔄 Yenile",
-            command=self.refresh_todo_list,
-            bg=self.accent_color,
-            fg='#000000',
-            font=("Arial", 10, "bold"),
-            padx=10
+            padx=15
         ).pack(side=tk.LEFT, padx=5)
         
         self.refresh_todo_list()
     
     def setup_weather_tab(self):
-        """Hava Durumu sekmesini kuruyor"""
-        # Başlık
-        title_label = tk.Label(
-            self.weather_frame,
-            text="🌤️ Hava Durumu Gösterge Paneli",
-            font=("Arial", 14, "bold"),
-            fg=self.accent_color,
-            bg=self.bg_color
-        )
-        title_label.pack(pady=10)
+        """Hava durumu sekmesini kuruyor"""
+        search_frame = tk.Frame(self.weather_frame, bg=self.dark_bg)
+        search_frame.pack(fill=tk.X, padx=10, pady=10)
         
-        # Şehir arama
-        search_frame = tk.Frame(self.weather_frame, bg=self.bg_color)
-        search_frame.pack(fill=tk.X, padx=15, pady=10)
-        
-        self.weather_input = tk.Entry(
+        tk.Label(
             search_frame,
-            bg='#1a1f3a',
+            text="Şehir:",
+            bg=self.dark_bg,
             fg=self.text_color,
-            insertbackground=self.accent_color,
-            font=("Arial", 11)
-        )
-        self.weather_input.pack(fill=tk.X, side=tk.LEFT, expand=True, padx=5)
-        self.weather_input.insert(0, "İstanbul")
-        self.weather_input.bind('<Return>', lambda e: self.fetch_weather())
+            font=("Arial", 10)
+        ).pack(side=tk.LEFT, padx=5)
         
-        search_btn = tk.Button(
+        self.weather_city_input = tk.Entry(
+            search_frame,
+            bg=self.bg_color,
+            fg=self.text_color,
+            font=("Arial", 10),
+            width=30
+        )
+        self.weather_city_input.pack(side=tk.LEFT, padx=5, expand=True)
+        self.weather_city_input.insert(0, "Istanbul")
+        self.weather_city_input.bind('<Return>', lambda e: self.fetch_weather())
+        
+        tk.Button(
             search_frame,
             text="🔍 Ara",
             command=self.fetch_weather,
             bg=self.accent_color,
             fg='#000000',
-            font=("Arial", 10, "bold"),
-            padx=15
-        )
-        search_btn.pack(side=tk.LEFT, padx=5)
+            font=("Arial", 10, "bold")
+        ).pack(side=tk.LEFT, padx=5)
         
-        # Hava durumu bilgisi
+        # Hava bilgisi gösterimi
         self.weather_display = scrolledtext.ScrolledText(
             self.weather_frame,
-            height=25,
+            height=20,
             width=100,
-            bg='#1a1f3a',
+            bg=self.bg_color,
             fg=self.text_color,
             font=("Arial", 11),
-            borderwidth=0
+            padx=10,
+            pady=10
         )
-        self.weather_display.pack(fill=tk.BOTH, expand=True, padx=15, pady=10)
+        self.weather_display.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         self.weather_display.config(state=tk.DISABLED)
         
         # İlk yükleme
@@ -321,97 +303,117 @@ class NikoApp:
     
     def setup_settings_tab(self):
         """Ayarlar sekmesini kuruyor"""
-        # Başlık
-        title_label = tk.Label(
+        settings_text = scrolledtext.ScrolledText(
             self.settings_frame,
-            text="⚙️ Niko Ayarları",
-            font=("Arial", 14, "bold"),
-            fg=self.accent_color,
-            bg=self.bg_color
-        )
-        title_label.pack(pady=20)
-        
-        # Bilgiler
-        info_text = """🤖 NIKO - AI Tıbbi Asistan v1.0
-
-📋 Özellikler:
-  ✓ Yapay Zeka tabanlı tıbbi tavsiye
-  ✓ Sesli komut (Türkçe)
-  ✓ Telefon özellikleri
-  ✓ Todo List yönetimi
-  ✓ Hava Durumu gösterge paneli
-  ✓ Web arama
-  ✓ Harita ve konum
-  ✓ Müzik çalma
-
-🎯 Nasıl Kullanılır:
-  1. Chat sekmesinde 'Niko' deyin
-  2. Belirtilerinizi söyleyin veya yazın
-  3. Niko sesli ve yazılı cevap verir
-  4. Todo List'te görev yönetin
-  5. Hava durumunu takip edin
-
-⚠️ ÖNEMLİ:
-  • Niko tıbbi tavsiye değildir
-  • Ciddi durumlarda doktora başvurun
-  • Kişisel bilgileriniz gizlidir
-  • API anahtarınızı gizli tutun
-
-💻 Sistem Gereksinimleri:
-  • Python 3.8+
-  • Mikrofon
-  • İnternet bağlantısı
-  • OpenAI API Anahtarı
-
-📞 Destek: github.com/cangcan1/Niko
-        """
-        
-        info_label = tk.Label(
-            self.settings_frame,
-            text=info_text,
-            font=("Arial", 11),
-            fg=self.text_color,
+            height=20,
+            width=100,
             bg=self.bg_color,
-            justify=tk.LEFT
+            fg=self.text_color,
+            font=("Courier", 10),
+            padx=15,
+            pady=15
         )
-        info_label.pack(pady=20, padx=30)
+        settings_text.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        settings_text.config(state=tk.NORMAL)
         
-        # Butonlar
-        button_frame = tk.Frame(self.settings_frame, bg=self.bg_color)
-        button_frame.pack(fill=tk.X, padx=15, pady=20)
+        info = """🤖 NIKO - AI Tıbbi Asistan v1.0
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📱 ÖZELLİKLER:
+
+  💬 CHAT & KOMUTLAR
+    • Sesli komut sistemi (tuşa basmadan)
+    • Tıbbi belirti analizi (GPT-3 tabanlı)
+    • T1bbi veritabanı (1000+ hastalık)
+    • Chat geçmişi
+  
+  ☎️ TELEFON ÖZELLİKLERİ
+    • Telefon çalma
+    • SMS gönderme
+    • Kişi yönetimi
+    • Hatırlatıcılar
+    • Timer & Alarm
+  
+  🎵 UYGULAMALAR
+    • Müzik çalma
+    • Web arama (DuckDuckGo)
+    • Harita & Konum
+    • Hava durumu
+  
+  📝 TODO LİSTESİ
+    • Görev ekleme/silme
+    • Tamamlama işareti
+    • Otomatik kayıt
+  
+  🌤️ HAVA DURUMU
+    • Gerçek zamanlı hava (OpenWeatherMap)
+    • Sıcaklık, nem, rüzgar
+    • Uyarılar
+
+🎤 SESLI KOMUT KULLANIMI:
+
+  1. Uygulamayı başlatın
+  2. 'Niko' deyin
+  3. Niko sesli cevap verecek
+  4. Komutunuzu söyleyin
+  5. Otomatik işlem yapılır
+
+📝 ÖRNEK KOMUTLAR:
+
+  • "Niko, başım ağrıyor"
+  • "Niko, annemi ara"
+  • "Niko, 5 dakika timer koy"
+  • "Niko, yarın doktor randevum"
+  • "Niko, hava durumu nasıl"
+
+💾 DEPOLAMA:
+
+  ✅ todos.json - Görev listesi
+  ✅ reminders.json - Hatırlatıcılar
+  ✅ contacts.json - Kişi listesi
+  ✅ Chat geçmişi
+
+⚙️ SISTEM GEREKSİNİMLERİ:
+
+  ✓ Python 3.8+
+  ✓ Mikrofon
+  ✓ İnternet bağlantısı
+  ✓ OpenAI API Anahtarı
+  ✓ OpenWeatherMap API Anahtarı
+
+📞 KİŞİLER:
+
+  • Anne: +90555123456
+  • Baba: +90555654321
+  • Ali: +90555789012
+  • Doktor: +90555345678
+  • Ambulans: 112
+
+🌐 API'LER:
+
+  • OpenAI GPT-3 (Tıbbi analiz)
+  • Google Speech Recognition (Ses tanıma)
+  • DuckDuckGo (Web arama)
+  • OpenWeatherMap (Hava durumu)
+
+⚠️ DİKKAT:
+
+  Niko t1bbi tavsiye değildir!
+  Ciddi durumlarda her zaman doktora başvurun.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🚀 Başlamak için Chat sekmesinde 'Niko' deyin!
+"""
         
-        tk.Button(
-            button_frame,
-            text="✅ Hakkında",
-            command=lambda: messagebox.showinfo(
-                "Niko Hakkında",
-                "🤖 NIKO - AI Tıbbi Asistan\n\nSürüm: 1.0\nGeliştiriciler: cangcan1\n\nNiko, modern yapay zeka teknolojisi kullanarak tıbbi tavsiye ve asistan hizmetleri sunar."
-            ),
-            bg=self.accent_color,
-            fg='#000000',
-            font=("Arial", 10, "bold"),
-            padx=20,
-            pady=10
-        ).pack(side=tk.LEFT, padx=5)
-        
-        tk.Button(
-            button_frame,
-            text="🔄 Ayarları Sıfırla",
-            command=lambda: messagebox.showinfo(
-                "Sıfırla",
-                "Ayarlar sıfırlandı!\nUygulamayı yeniden başlatın."
-            ),
-            bg='#FFA500',
-            fg='#000000',
-            font=("Arial", 10, "bold"),
-            padx=20,
-            pady=10
-        ).pack(side=tk.LEFT, padx=5)
+        settings_text.insert('1.0', info)
+        settings_text.config(state=tk.DISABLED)
     
     def add_message(self, sender, text):
         """Chat'e mesaj ekleme"""
         self.chat_display.config(state=tk.NORMAL)
-        self.chat_display.insert(tk.END, f"\n{sender}: {text}\n")
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        self.chat_display.insert(tk.END, f"[{timestamp}] {sender}: {text}\n\n")
         self.chat_display.see(tk.END)
         self.chat_display.config(state=tk.DISABLED)
     
@@ -425,125 +427,74 @@ class NikoApp:
         self.add_message("Siz", message)
         self.status_label.config(text="🤔 Düşünüyorum...")
         
+        # Thread'de işleme
         threading.Thread(target=self.process_command, args=(message,), daemon=True).start()
     
     def process_command(self, text):
-        """Komutu işleme ve uygun özelliği çalıştırma"""
+        """Komutu işleme"""
         text_lower = text.lower()
         
         try:
-            # Telefon özellikleri kontrol etme
+            if not self.niko_ai:
+                self.add_message("Niko", "❌ OpenAI API anahtarı bulunamadı. .env dosyasını kontrol edin.")
+                return
+            
+            # Telefon özellikleri
             if 'ara' in text_lower or 'telefon' in text_lower:
-                self.handle_call(text)
+                contact_name = self.extract_contact(text)
+                result = self.phone_features.make_call(contact_name)
+                self.add_message("Niko", result)
+                self.voice_manager.speak(result)
+            
             elif 'mesaj' in text_lower or 'sms' in text_lower:
-                self.handle_sms(text)
+                contact_name = self.extract_contact(text)
+                result = self.phone_features.send_sms(contact_name, text)
+                self.add_message("Niko", result)
+                self.voice_manager.speak(result)
+            
             elif 'takvim' in text_lower or 'randevu' in text_lower or 'hatırla' in text_lower:
-                self.handle_calendar(text)
+                result = self.phone_features.add_reminder(text)
+                self.add_message("Niko", result)
+                self.voice_manager.speak(result)
+            
             elif 'timer' in text_lower or 'alarm' in text_lower:
-                self.handle_timer(text)
+                result = self.phone_features.set_timer(text)
+                self.add_message("Niko", result)
+                self.voice_manager.speak(result)
+            
             elif 'müzik' in text_lower or 'şarkı' in text_lower:
-                self.handle_music(text)
+                result = self.phone_features.play_music(text)
+                self.add_message("Niko", result)
+                self.voice_manager.speak(result)
+            
             elif 'harita' in text_lower or 'yer' in text_lower or 'hastane' in text_lower:
-                self.handle_map(text)
+                result = self.phone_features.find_location(text)
+                self.add_message("Niko", result)
+                self.voice_manager.speak(result)
+            
             elif 'hava' in text_lower or 'hava durumu' in text_lower:
-                self.handle_weather_command(text)
+                result = self.phone_features.get_weather()
+                self.add_message("Niko", result)
+                self.voice_manager.speak(result)
+            
             elif 'arama' in text_lower or 'araştır' in text_lower or 'internet' in text_lower:
-                self.handle_web_search(text)
+                result = self.phone_features.web_search(text)
+                self.add_message("Niko", result)
+            
             else:
                 # Tıbbi analiz
                 response = self.niko_ai.analyze_symptoms(text)
                 self.add_message("Niko", response)
-                try:
-                    self.voice_manager.speak(response[:150])
-                except:
-                    pass
+                self.voice_manager.speak(response[:200])  # İlk 200 char sesli
         
         except Exception as e:
-            error_msg = f"Hata oluştu: {str(e)}"
+            error_msg = f"❌ Hata oluştu: {str(e)}"
             self.add_message("Niko", error_msg)
         
         self.status_label.config(text="🎤 Dinliyorum... 'Niko' deyin!")
     
-    def handle_call(self, text):
-        """Telefon çalması"""
-        contact_name = self.extract_contact(text)
-        result = self.phone_features.make_call(contact_name)
-        self.add_message("Niko", result)
-        try:
-            self.voice_manager.speak(result)
-        except:
-            pass
-    
-    def handle_sms(self, text):
-        """Mesaj gönderme"""
-        contact_name = self.extract_contact(text)
-        result = self.phone_features.send_sms(contact_name, text)
-        self.add_message("Niko", result)
-        try:
-            self.voice_manager.speak(result)
-        except:
-            pass
-    
-    def handle_calendar(self, text):
-        """Takvim ve hatırlatıcı"""
-        result = self.phone_features.add_reminder(text)
-        self.add_message("Niko", result)
-        try:
-            self.voice_manager.speak(result)
-        except:
-            pass
-    
-    def handle_timer(self, text):
-        """Timer ve alarm"""
-        result = self.phone_features.set_timer(text)
-        self.add_message("Niko", result)
-        try:
-            self.voice_manager.speak(result)
-        except:
-            pass
-    
-    def handle_music(self, text):
-        """Müzik çalma"""
-        result = self.phone_features.play_music(text)
-        self.add_message("Niko", result)
-        try:
-            self.voice_manager.speak(result)
-        except:
-            pass
-    
-    def handle_map(self, text):
-        """Harita ve konum"""
-        result = self.phone_features.find_location(text)
-        self.add_message("Niko", result)
-        try:
-            self.voice_manager.speak(result)
-        except:
-            pass
-    
-    def handle_weather_command(self, text):
-        """Hava durumu komutu"""
-        result = "🌤️ Hava Durumu sekmesini açıyorum..."
-        self.add_message("Niko", result)
-        self.notebook.select(2)  # Hava Durumu sekmesine git
-    
-    def handle_web_search(self, text):
-        """İnternet arama"""
-        result = self.phone_features.web_search(text)
-        self.add_message("Niko", result)
-        try:
-            self.voice_manager.speak(result[:100])
-        except:
-            pass
-    
-    def extract_contact(self, text):
-        """Metinden kişi adı çıkarma"""
-        words = text.split()
-        if len(words) > 1:
-            return words[-1]
-        return "Tanımsız"
-    
     def voice_input(self):
-        """Sesli giriş"""
+        """Sesli giriş butonu"""
         self.status_label.config(text="🎤 Dinliyorum...")
         threading.Thread(target=self._voice_input_thread, daemon=True).start()
     
@@ -555,36 +506,32 @@ class NikoApp:
                 self.input_text.insert(0, text)
                 self.root.after(100, self.send_message)
         except Exception as e:
-            self.add_message("Niko", f"Ses tanıma hatası: {str(e)}")
+            self.add_message("Niko", f"❌ Ses tanıma hatası: {str(e)}")
         
         self.status_label.config(text="🎤 Dinliyorum... 'Niko' deyin!")
     
     def start_continuous_listening(self):
-        """Arka planda sürekli sesli komut dinlemesini başlat"""
+        """Arka planda sesli dinlemeyi başlat"""
         threading.Thread(target=self._continuous_listening_thread, daemon=True).start()
     
     def _continuous_listening_thread(self):
-        """Arka planda sürekli dinleme yapan thread"""
-        import time
+        """Arka planda sesli komut dinleme"""
         while self.continuous_listening:
             try:
                 text = self.voice_manager.listen_without_timeout()
                 
                 if text and 'niko' in text.lower():
-                    # Avatar renk değişimi (canlanma)
+                    # Avatar animasyonu
                     self.avatar_label.config(fg='#FF69B4')
                     self.root.after(100, lambda: self.avatar_label.config(fg=self.accent_color))
                     
-                    self.status_label.config(text="💬 Evet, buradayım! Ne istiyorsunuz?")
-                    try:
-                        self.voice_manager.speak("Buraday ım, ne yardimci olabilirim?")
-                    except:
-                        pass
+                    # Cevap ver
+                    self.status_label.config(text="🎤 Dinliyorum (Detaylı)...")
+                    self.voice_manager.speak("Buraday ım, ne yardimci olabilirim?")
                     
-                    # Komut dinle
-                    time.sleep(0.5)
+                    # Komutu dinle
                     command = self.voice_manager.listen()
-                    if command and command != "Anlamadım, lütfen tekrar söyleyin." and "hata" not in command.lower():
+                    if command and "hata" not in command.lower():
                         self.input_text.delete(0, tk.END)
                         self.input_text.insert(0, command)
                         self.root.after(100, self.send_message)
@@ -593,72 +540,104 @@ class NikoApp:
                 
             except Exception as e:
                 continue
-            
-            time.sleep(0.1)
-    
-    def show_contacts(self):
-        """Kişiler listesi gösterme"""
-        contacts_text = "📞 Kaydedilen Kişiler:\n\n"
-        for name, phone in self.contacts.items():
-            contacts_text += f"  • {name}: {phone}\n"
-        self.add_message("Niko", contacts_text)
-    
-    def web_search(self):
-        """Web arama başlatma"""
-        self.input_text.insert(0, "Bunu araştır: ")
-    
-    def play_music(self):
-        """Müzik çalma"""
-        self.input_text.insert(0, "Müzik çal: ")
-    
-    def show_map(self):
-        """Harita gösterme"""
-        self.input_text.insert(0, "Yakındaki harita göster: ")
     
     def add_todo(self):
-        """Todo ekleme"""
-        task = self.todo_input.get().strip()
-        if task:
-            self.todo_manager.add_task(task)
-            self.todo_input.delete(0, tk.END)
-            self.refresh_todo_list()
+        """Görev ekleme"""
+        text = self.todo_input.get().strip()
+        if not text:
+            messagebox.showwarning("Uyarı", "Görev metni giriniz!")
+            return
+        
+        self.todo_manager.add_todo(text)
+        self.todo_input.delete(0, tk.END)
+        self.refresh_todo_list()
+        self.add_message("Niko", f"✅ Görev eklendi: {text}")
     
-    def toggle_todo(self, event):
-        """Todo tamamla/tamamlanmadı işaretle"""
-        selection = self.todo_display.curselection()
-        if selection:
-            idx = selection[0]
-            self.todo_manager.toggle_task(idx)
-            self.refresh_todo_list()
+    def toggle_todo(self):
+        """Görev tamamlama durumunu değiştir"""
+        selection = self.todo_listbox.curselection()
+        if not selection:
+            messagebox.showwarning("Uyarı", "Görev seçiniz!")
+            return
+        
+        index = selection[0]
+        self.todo_manager.toggle_todo(index)
+        self.refresh_todo_list()
     
     def delete_todo(self):
-        """Todo silme"""
-        selection = self.todo_display.curselection()
-        if selection:
-            idx = selection[0]
-            self.todo_manager.delete_task(idx)
-            self.refresh_todo_list()
+        """Görev silme"""
+        selection = self.todo_listbox.curselection()
+        if not selection:
+            messagebox.showwarning("Uyarı", "Görev seçiniz!")
+            return
+        
+        index = selection[0]
+        self.todo_manager.delete_todo(index)
+        self.refresh_todo_list()
     
     def refresh_todo_list(self):
         """Todo listesini yenile"""
-        self.todo_display.delete(0, tk.END)
-        tasks = self.todo_manager.get_tasks()
-        for idx, task in enumerate(tasks):
-            status = "✅" if task['completed'] else "⭕"
-            self.todo_display.insert(tk.END, f"{status} {task['title']}")
+        self.todo_listbox.delete(0, tk.END)
+        todos = self.todo_manager.get_todos()
+        for todo in todos:
+            status = "✅" if todo['completed'] else "⭕"
+            self.todo_listbox.insert(tk.END, f"{status} {todo['text']}")
     
     def fetch_weather(self):
         """Hava durumunu getir"""
-        city = self.weather_input.get().strip() or "İstanbul"
-        weather_info = self.weather_dashboard.get_weather(city)
+        city = self.weather_city_input.get().strip()
+        if not city:
+            city = "Istanbul"
         
         self.weather_display.config(state=tk.NORMAL)
-        self.weather_display.delete('1.0', tk.END)
-        self.weather_display.insert(tk.END, weather_info)
+        self.weather_display.delete(1.0, tk.END)
+        self.weather_display.insert(tk.END, f"🔄 {city} için hava durumu yükleniyor...\n\n")
         self.weather_display.config(state=tk.DISABLED)
+        
+        threading.Thread(target=self._fetch_weather_thread, args=(city,), daemon=True).start()
+    
+    def _fetch_weather_thread(self, city):
+        try:
+            weather_info = self.weather_dashboard.get_weather(city)
+            self.weather_display.config(state=tk.NORMAL)
+            self.weather_display.delete(1.0, tk.END)
+            self.weather_display.insert(tk.END, weather_info)
+            self.weather_display.config(state=tk.DISABLED)
+        except Exception as e:
+            self.weather_display.config(state=tk.NORMAL)
+            self.weather_display.delete(1.0, tk.END)
+            self.weather_display.insert(tk.END, f"❌ Hata: {str(e)}")
+            self.weather_display.config(state=tk.DISABLED)
+    
+    def show_contacts(self):
+        """Kişileri göster"""
+        try:
+            with open('contacts.json', 'r', encoding='utf-8') as f:
+                self.contacts = json.load(f)
+        except:
+            self.contacts = {}
+        
+        contacts_text = "📞 Kaydedilen Kişiler:\n\n"
+        for name, phone in self.contacts.items():
+            contacts_text += f"  • {name}: {phone}\n"
+        
+        self.add_message("Niko", contacts_text)
+    
+    def extract_contact(self, text):
+        """Metinden kişi adı çıkart"""
+        words = text.split()
+        if len(words) > 1:
+            return words[-1]
+        return "Tanımsız"
+    
+    def clear_chat(self):
+        """Chat temizle"""
+        self.chat_display.config(state=tk.NORMAL)
+        self.chat_display.delete(1.0, tk.END)
+        self.chat_display.config(state=tk.DISABLED)
     
     def load_contacts(self):
-        """Kişileri yükleme"""
+        """Kişileri yükle"""
         try:
             with open('contacts.json', 'r', encoding='utf-8') as f:
                 self.contacts = json.load(f)
@@ -668,4 +647,8 @@ class NikoApp:
 if __name__ == "__main__":
     root = tk.Tk()
     app = NikoApp(root)
+    
+    # Hoş geldiniz mesajı
+    root.after(1000, lambda: app.add_message("Niko", "👋 Merhaba! Ben Niko, AI Tıbbi Asistan!\n\nBaşlamak için 'Niko' deyin ya da aşağıdaki butonları kullanın.\n\n🎤 Sesli komut, 📝 Görevler, 🌤️ Hava durumu ve daha fazlası!"))
+    
     root.mainloop()
